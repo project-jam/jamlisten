@@ -4,11 +4,15 @@ from discord import app_commands
 import yt_dlp
 import os
 from youtubeSpotifyConverter import youtubeSpotifyConverter
+from dotenv import load_dotenv  # Import load_dotenv
 
-# Replace with your actual keys
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+# Load environment variables from .env file
+load_dotenv()
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")  # Your YouTube API key
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")  # Your Spotify Client ID
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")  # Your Spotify Client Secret
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")  # Your Discord bot token
 
 # Instantiate a youtubeSpotifyConverter object
 converter = youtubeSpotifyConverter(YOUTUBE_API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
@@ -169,5 +173,5 @@ async def on_ready():
     print("Slash commands synced.")
 
 # Run the bot
-bot.run(os.getenv("DISCORD_TOKEN"))
+bot.run(DISCORD_TOKEN)
 
