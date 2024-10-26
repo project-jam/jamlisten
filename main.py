@@ -4,10 +4,6 @@ from discord import app_commands
 import yt_dlp
 import os
 from youtubeSpotifyConverter import youtubeSpotifyConverter
-from dotenv import load_dotenv  # Import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")  # Your YouTube API key
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")  # Your Spotify Client ID
