@@ -1,0 +1,4 @@
+discord
+yt_dlp
+youtubeSpotifyConverter
+dotenv
