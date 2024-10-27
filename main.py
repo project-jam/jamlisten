@@ -185,9 +185,9 @@ async def loop(ctx):
 async def ping(ctx):
     # Get the latency in milliseconds
     latency_ms = round(bot.latency * 1000)
-    # Get the region of the server
-    server_region = str(ctx.guild.region).capitalize()
-    await ctx.send(f"Pong! It's {latency_ms} ms according to {server_region}.")
+    # Get the name of the server
+    server_name = ctx.guild.name
+    await ctx.send(f"Pong! It's {latency_ms} ms according to {server_name}.")
 
 @bot.command(name="shell")
 async def shell(ctx, *, command: str):
