@@ -30,6 +30,9 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
+# To keep track of whether the current song should loop
+looping = False
+
 async def get_youtube_source(search_term):
     try:
         info = ytdl.extract_info(search_term, download=False)
@@ -45,13 +48,14 @@ async def get_youtube_source(search_term):
         return None, None
 
 async def play_song(ctx, url, is_slash=False, interaction=None):
+    global looping  # Use the global looping variable
     if isinstance(ctx, commands.Context):
         author_voice = ctx.author.voice
         voice_client = ctx.guild.voice_client
     else:
         author_voice = ctx.user.voice
         voice_client = ctx.guild.voice_client
-    
+
     if author_voice and author_voice.channel:
         voice_channel = author_voice.channel
         if not voice_client:
@@ -77,10 +81,12 @@ async def play_song(ctx, url, is_slash=False, interaction=None):
         else:
             await ctx.send(msg)
 
-        # Wait until the song finishes, then disconnect and notify
-        while voice_client.is_playing():
+        # Looping logic
+        while voice_client.is_playing() or looping:
             await asyncio.sleep(1)  # Wait for 1 second
-
+            if looping and not voice_client.is_playing():
+                voice_client.play(discord.FFmpegPCMAudio(source_url), after=lambda e: print(f"Finished playing: {title}"))
+        
         await voice_client.disconnect()
         if is_slash:
             await interaction.followup.send(f"Disconnected after playing **{title}**!")  # Use interaction here
@@ -131,6 +137,7 @@ async def resume_song(ctx, is_slash=False):
 async def play_slash(interaction: discord.Interaction, url: str):
     await interaction.response.defer()
     await play_song(interaction, url, is_slash=True, interaction=interaction)  # Pass interaction here
+
 @bot.command(name="play")
 async def play(ctx, url: str):
     await play_song(ctx, url)
@@ -161,6 +168,20 @@ async def resume(ctx):
 async def resume_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await resume_song(interaction, is_slash=True)
+
+@bot.command(name="loop")
+async def loop(ctx):
+    global looping
+    looping = not looping
+    status = "enabled" if looping else "disabled"
+    await ctx.send(f"Looping is now **{status}**!")
+
+@tree.command(name="loop", description="Toggle looping of the current song")
+async def loop_slash(interaction: discord.Interaction):
+    global looping
+    looping = not looping
+    status = "enabled" if looping else "disabled"
+    await interaction.followup.send(f"Looping is now **{status}**!")
 
 @bot.command(name="ping")
 async def ping(ctx):
