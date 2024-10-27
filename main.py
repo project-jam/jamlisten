@@ -17,6 +17,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="jam!", intents=intents)
 tree = bot.tree
 
+# Global options for yt-dlp
 ytdl_opts = {
     'format': 'bestaudio/best',
     'default_search': 'ytsearch',
@@ -28,8 +29,15 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
-# Global variable to store loop status
-is_looping = False
+# Store each guild's music state in a dictionary
+guild_music_state = {}
+
+class GuildMusicState:
+    def __init__(self):
+        self.loop = False
+        self.current_song = None
+        self.voice_client = None
+        self.is_playing = False
 
 async def get_youtube_source(search_term):
     try:
@@ -44,41 +52,54 @@ async def get_youtube_source(search_term):
         print(f"Error extracting information: {e}")
         return None, None
 
-async def play_song(ctx, url, is_slash=False):
-    global is_looping
-    if isinstance(ctx, commands.Context):
-        author_voice = ctx.author.voice
-        voice_client = ctx.guild.voice_client
-    else:
-        author_voice = ctx.user.voice
-        voice_client = ctx.guild.voice_client
+async def play_song(ctx, url, is_slash=False, loop=False):
+    guild_id = ctx.guild.id
+    if guild_id not in guild_music_state:
+        guild_music_state[guild_id] = GuildMusicState()
     
+    music_state = guild_music_state[guild_id]
+    author_voice = ctx.author.voice if isinstance(ctx, commands.Context) else ctx.user.voice
+    voice_client = music_state.voice_client
+
     if author_voice and author_voice.channel:
         voice_channel = author_voice.channel
         if not voice_client:
-            voice_client = await voice_channel.connect()
-
+            music_state.voice_client = await voice_channel.connect()
+        
         if "spotify.com" in url:
             links = converter.C_fromLink(url)
             url = links.get('youtube', url)
 
         source_url, title = await get_youtube_source(url)
-
-        def after_playing(error):
-            if error:
-                print(f"Playback error: {error}")
-            elif is_looping:
-                voice_client.play(discord.FFmpegPCMAudio(source_url), after=after_playing)
+        if not source_url:
+            msg = "Couldn't fetch the audio source!"
+            if is_slash:
+                await ctx.followup.send(content=msg)
             else:
-                bot.loop.create_task(voice_client.disconnect())
-                bot.loop.create_task(ctx.send("Disconnected because the song finished playing."))
+                await ctx.send(msg)
+            return
 
-        if voice_client.is_playing():
-            voice_client.stop()
+        def after_playing(error=None):
+            if error:
+                print(f"Player error: {error}")
+            elif music_state.loop:
+                # Play the song again if looping
+                play_song(ctx, url, is_slash, loop=True)
+            else:
+                # Disconnect and notify after song completion
+                bot.loop.create_task(ctx.send("Song finished! Disconnecting..."))
+                bot.loop.create_task(music_state.voice_client.disconnect())
+                del guild_music_state[guild_id]
 
-        voice_client.play(discord.FFmpegPCMAudio(source_url), after=after_playing)
-        msg = f"Playing **{title}**!"
-        
+        if music_state.voice_client.is_playing():
+            music_state.voice_client.stop()
+
+        music_state.voice_client.play(discord.FFmpegPCMAudio(source_url), after=after_playing)
+        music_state.current_song = title
+        music_state.is_playing = True
+        music_state.loop = loop
+
+        msg = f"Playing **{title}**!" + (" (Looping)" if loop else "")
         if is_slash:
             await ctx.followup.send(content=msg)
         else:
@@ -90,93 +111,52 @@ async def play_song(ctx, url, is_slash=False):
         else:
             await ctx.send(msg)
 
-async def stop_song(ctx, is_slash=False):
-    global is_looping
-    is_looping = False  # Reset loop status
-    if ctx.guild.voice_client:
-        await ctx.guild.voice_client.disconnect()
-        msg = "Stopped the music and left the voice channel."
-    else:
-        msg = "I'm not currently in a voice channel!"
-    
-    if is_slash:
-        await ctx.followup.send(content=msg)
-    else:
-        await ctx.send(msg)
-
-async def pause_song(ctx, is_slash=False):
-    if ctx.guild.voice_client and ctx.guild.voice_client.is_playing():
-        ctx.guild.voice_client.pause()
-        msg = "Paused the music."
-    else:
-        msg = "No music is currently playing!"
-    
-    if is_slash:
-        await ctx.followup.send(content=msg)
-    else:
-        await ctx.send(msg)
-
-async def resume_song(ctx, is_slash=False):
-    if ctx.guild.voice_client and ctx.guild.voice_client.is_paused():
-        ctx.guild.voice_client.resume()
-        msg = "Resumed the music."
-    else:
-        msg = "No music is currently paused!"
-    
-    if is_slash:
-        await ctx.followup.send(content=msg)
-    else:
-        await ctx.send(msg)
+@bot.command(name="play")
+async def play(ctx, url: str):
+    await play_song(ctx, url)
 
 @tree.command(name="play", description="Play a song from a URL in the voice channel")
 async def play_slash(interaction: discord.Interaction, url: str):
     await interaction.response.defer()
     await play_song(interaction, url, is_slash=True)
 
-@bot.command(name="play")
-async def play(ctx, url: str):
-    await play_song(ctx, url)
+@bot.command(name="loop")
+async def toggle_loop(ctx):
+    guild_id = ctx.guild.id
+    if guild_id in guild_music_state:
+        music_state = guild_music_state[guild_id]
+        music_state.loop = not music_state.loop
+        await ctx.send(f"Looping is now {'enabled' if music_state.loop else 'disabled'}.")
+    else:
+        await ctx.send("Nothing is playing to loop.")
+
+@tree.command(name="loop", description="Toggle looping for the current song")
+async def toggle_loop_slash(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    await interaction.response.defer()
+    if guild_id in guild_music_state:
+        music_state = guild_music_state[guild_id]
+        music_state.loop = not music_state.loop
+        await interaction.followup.send(f"Looping is now {'enabled' if music_state.loop else 'disabled'}.")
+    else:
+        await interaction.followup.send("Nothing is playing to loop.")
 
 @bot.command(name="stop")
 async def stop(ctx):
-    await stop_song(ctx)
+    guild_id = ctx.guild.id
+    if guild_id in guild_music_state:
+        music_state = guild_music_state[guild_id]
+        if music_state.voice_client:
+            await music_state.voice_client.disconnect()
+            await ctx.send("Stopped the music and left the voice channel.")
+            del guild_music_state[guild_id]
+    else:
+        await ctx.send("I'm not currently in a voice channel!")
 
 @tree.command(name="stop", description="Stop the music and leave the voice channel")
 async def stop_slash(interaction: discord.Interaction):
     await interaction.response.defer()
-    await stop_song(interaction, is_slash=True)
-
-@bot.command(name="pause")
-async def pause(ctx):
-    await pause_song(ctx)
-
-@tree.command(name="pause", description="Pause the currently playing music")
-async def pause_slash(interaction: discord.Interaction):
-    await interaction.response.defer()
-    await pause_song(interaction, is_slash=True)
-
-@bot.command(name="resume")
-async def resume(ctx):
-    await resume_song(ctx)
-
-@tree.command(name="resume", description="Resume the paused music")
-async def resume_slash(interaction: discord.Interaction):
-    await interaction.response.defer()
-    await resume_song(interaction, is_slash=True)
-
-@bot.command(name="loop")
-async def toggle_loop(ctx):
-    global is_looping
-    is_looping = not is_looping
-    status = "enabled" if is_looping else "disabled"
-    await ctx.send(f"Looping is now {status}.")
-
-@tree.command(name="loop", description="Toggle looping for the currently playing song")
-async def loop_slash(interaction: discord.Interaction):
-    global is_looping
-    is_looping = not is_looping
-    status = "enabled" if is_looping else "disabled"
-    await interaction.response.send_message(f"Looping is now {status}.")
+    await stop(interaction)
 
 @bot.event
 async def on_ready():
