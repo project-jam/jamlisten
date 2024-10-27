@@ -4,7 +4,6 @@ from discord import app_commands
 import yt_dlp
 import os
 import subprocess
-import asyncio
 from youtubeSpotifyConverter import youtubeSpotifyConverter
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
@@ -29,9 +28,6 @@ ytdl_opts = {
     }]
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
-
-# Store voice clients per guild
-voice_clients = {}
 
 async def get_youtube_source(search_term):
     try:
@@ -69,13 +65,23 @@ async def play_song(ctx, url, is_slash=False):
         if voice_client.is_playing():
             voice_client.stop()
 
-        voice_client.play(discord.FFmpegPCMAudio(source_url), after=lambda e: asyncio.run(disconnect_after_playing(ctx, title, is_slash)))
+        voice_client.play(discord.FFmpegPCMAudio(source_url), after=lambda e: print(f"Finished playing: {title}"))
+        voice_client.source = discord.PCMVolumeTransformer(voice_client.source)
+        voice_client.source.volume = 0.5  # Adjust the volume as needed
+
         msg = f"Playing **{title}**!"
         
         if is_slash:
             await ctx.followup.send(content=msg)
         else:
             await ctx.send(msg)
+
+        # Wait until the song finishes, then disconnect and notify
+        while voice_client.is_playing():
+            await discord.utils.sleep_until(discord.utils.utcnow() + discord.utils.sleep_until(1))
+
+        await voice_client.disconnect()
+        await ctx.send(f"Disconnected after playing **{title}**!")
     else:
         msg = "You need to join a voice channel first!"
         if is_slash:
@@ -83,23 +89,13 @@ async def play_song(ctx, url, is_slash=False):
         else:
             await ctx.send(msg)
 
-async def disconnect_after_playing(ctx, title, is_slash):
-    if ctx.guild.voice_client and ctx.guild.voice_client.is_connected():
-        msg = f"Finished playing **{title}**. Disconnecting from the voice channel."
-        if is_slash:
-            await ctx.followup.send(content=msg)
-        else:
-            await ctx.send(msg)
-
-        await ctx.guild.voice_client.disconnect()
-
 async def stop_song(ctx, is_slash=False):
     if ctx.guild.voice_client:
         await ctx.guild.voice_client.disconnect()
         msg = "Stopped the music and left the voice channel."
     else:
         msg = "I'm not currently in a voice channel!"
-
+    
     if is_slash:
         await ctx.followup.send(content=msg)
     else:
@@ -165,27 +161,20 @@ async def resume_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await resume_song(interaction, is_slash=True)
 
-@tree.command(name="ping", description="Check the bot's latency")
-async def ping(interaction: discord.Interaction):
-    latency = round(bot.latency * 1000)  # Convert to milliseconds
-    await interaction.response.send_message(f"Pong! 🏓 Latency: {latency}ms")
-
 @bot.command(name="ping")
-async def ping_command(ctx):
-    latency = round(bot.latency * 1000)  # Convert to milliseconds
-    await ctx.send(f"Pong! 🏓 Latency: {latency}ms")
+async def ping(ctx):
+    await ctx.send("Pong!")
 
 @bot.command(name="shell")
 async def shell(ctx, *, command: str):
     try:
-        # Run the shell command and get the output
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        output = result.stdout.strip() or result.stderr.strip()  # Get output or error
-        
+        output = result.stdout.strip() or result.stderr.strip()
+
         if output:
             # Split the output into chunks of 2000 characters or less
             for i in range(0, len(output), 2000):
-                await ctx.send(f"```{output[i:i + 2000]}```")
+                await ctx.send(f"```\n{output[i:i + 2000]}\n```")
         else:
             await ctx.send("No output returned.")
     except Exception as e:
@@ -199,9 +188,8 @@ async def shell_slash(interaction: discord.Interaction, command: str):
         output = result.stdout.strip() or result.stderr.strip()
         
         if output:
-            # Split the output into chunks of 2000 characters or less
             for i in range(0, len(output), 2000):
-                await interaction.followup.send(f"```{output[i:i + 2000]}```")
+                await interaction.followup.send(f"```\n{output[i:i + 2000]}\n```")
         else:
             await interaction.followup.send("No output returned.")
     except Exception as e:
