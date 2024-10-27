@@ -17,7 +17,6 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="jam!", intents=intents)
 tree = bot.tree
 
-# Global options for yt-dlp
 ytdl_opts = {
     'format': 'bestaudio/best',
     'default_search': 'ytsearch',
@@ -29,7 +28,6 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
-# Store each guild's music state in a dictionary
 guild_music_state = {}
 
 class GuildMusicState:
@@ -61,11 +59,12 @@ async def play_song(ctx, url, is_slash=False, loop=False):
     author_voice = ctx.author.voice if isinstance(ctx, commands.Context) else ctx.user.voice
     voice_client = music_state.voice_client
 
+    # Check if the user is in a voice channel and bot is not connected
     if author_voice and author_voice.channel:
         voice_channel = author_voice.channel
-        if not voice_client:
+        if not voice_client or not voice_client.is_connected():
             music_state.voice_client = await voice_channel.connect()
-        
+
         if "spotify.com" in url:
             links = converter.C_fromLink(url)
             url = links.get('youtube', url)
@@ -83,10 +82,8 @@ async def play_song(ctx, url, is_slash=False, loop=False):
             if error:
                 print(f"Player error: {error}")
             elif music_state.loop:
-                # Play the song again if looping
                 play_song(ctx, url, is_slash, loop=True)
             else:
-                # Disconnect and notify after song completion
                 bot.loop.create_task(ctx.send("Song finished! Disconnecting..."))
                 bot.loop.create_task(music_state.voice_client.disconnect())
                 del guild_music_state[guild_id]
