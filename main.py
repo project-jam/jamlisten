@@ -181,8 +181,11 @@ async def shell(ctx, *, command: str):
         # Run the shell command and get the output
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         output = result.stdout.strip() or result.stderr.strip()  # Get output or error
+        
         if output:
-            await ctx.send(f"```{output}```")
+            # Split the output into chunks of 2000 characters or less
+            for i in range(0, len(output), 2000):
+                await ctx.send(f"```{output[i:i + 2000]}```")
         else:
             await ctx.send("No output returned.")
     except Exception as e:
@@ -194,8 +197,11 @@ async def shell_slash(interaction: discord.Interaction, command: str):
     try:
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         output = result.stdout.strip() or result.stderr.strip()
+        
         if output:
-            await interaction.followup.send(f"```{output}```")
+            # Split the output into chunks of 2000 characters or less
+            for i in range(0, len(output), 2000):
+                await interaction.followup.send(f"```{output[i:i + 2000]}```")
         else:
             await interaction.followup.send("No output returned.")
     except Exception as e:
