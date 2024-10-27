@@ -44,7 +44,7 @@ async def get_youtube_source(search_term):
         print(f"Error extracting information: {e}")
         return None, None
 
-async def play_song(ctx, url, is_slash=False):
+async def play_song(ctx, url, is_slash=False, interaction=None):
     if isinstance(ctx, commands.Context):
         author_voice = ctx.author.voice
         voice_client = ctx.guild.voice_client
@@ -73,7 +73,7 @@ async def play_song(ctx, url, is_slash=False):
         msg = f"Playing **{title}**!"
         
         if is_slash:
-            await ctx.followup.send(content=msg)
+            await interaction.followup.send(content=msg)  # Use interaction here
         else:
             await ctx.send(msg)
 
@@ -82,11 +82,12 @@ async def play_song(ctx, url, is_slash=False):
             await asyncio.sleep(1)  # Wait for 1 second
 
         await voice_client.disconnect()
-        await interaction.response.send_message(f"Disconnected after playing **{title}**!")
+        if is_slash:
+            await interaction.followup.send(f"Disconnected after playing **{title}**!")  # Use interaction here
     else:
         msg = "You need to join a voice channel first!"
         if is_slash:
-            await ctx.followup.send(content=msg)
+            await interaction.followup.send(content=msg)  # Use interaction here
         else:
             await ctx.send(msg)
 
@@ -129,8 +130,7 @@ async def resume_song(ctx, is_slash=False):
 @tree.command(name="play", description="Play a song from a URL in the voice channel")
 async def play_slash(interaction: discord.Interaction, url: str):
     await interaction.response.defer()
-    await play_song(interaction, url, is_slash=True)
-
+    await play_song(interaction, url, is_slash=True, interaction=interaction)  # Pass interaction here
 @bot.command(name="play")
 async def play(ctx, url: str):
     await play_song(ctx, url)
