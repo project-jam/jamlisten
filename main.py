@@ -3,8 +3,9 @@ from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import os
-from youtubeSpotifyConverter import youtubeSpotifyConverter
+import subprocess
 import asyncio
+from youtubeSpotifyConverter import youtubeSpotifyConverter
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
@@ -173,6 +174,32 @@ async def ping(interaction: discord.Interaction):
 async def ping_command(ctx):
     latency = round(bot.latency * 1000)  # Convert to milliseconds
     await ctx.send(f"Pong! 🏓 Latency: {latency}ms")
+
+@bot.command(name="shell")
+async def shell(ctx, *, command: str):
+    try:
+        # Run the shell command and get the output
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = result.stdout.strip() or result.stderr.strip()  # Get output or error
+        if output:
+            await ctx.send(f"```{output}```")
+        else:
+            await ctx.send("No output returned.")
+    except Exception as e:
+        await ctx.send(f"An error occurred: {e}")
+
+@tree.command(name="shell", description="Execute a shell command")
+async def shell_slash(interaction: discord.Interaction, command: str):
+    await interaction.response.defer()
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = result.stdout.strip() or result.stderr.strip()
+        if output:
+            await interaction.followup.send(f"```{output}```")
+        else:
+            await interaction.followup.send("No output returned.")
+    except Exception as e:
+        await interaction.followup.send(f"An error occurred: {e}")
 
 @bot.event
 async def on_ready():
