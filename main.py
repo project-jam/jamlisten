@@ -82,7 +82,7 @@ async def play_song(ctx, url, is_slash=False):
             await asyncio.sleep(1)  # Wait for 1 second
 
         await voice_client.disconnect()
-        await ctx.send(f"Disconnected after playing **{title}**!")
+        await interaction.response.send_message(f"Disconnected after playing **{title}**!")
     else:
         msg = "You need to join a voice channel first!"
         if is_slash:
