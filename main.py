@@ -19,6 +19,7 @@ tree = bot.tree
 
 ytdl_opts = {
     'format': 'bestaudio/best',
+    'default_search': 'ytsearch',
     'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
@@ -27,9 +28,24 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
-async def get_youtube_source(url):
-    info = ytdl.extract_info(url, download=False)
-    return info['url'], info['title']
+async def get_youtube_source(search_term):
+    try:
+        # Search for video using yt-dlp
+        info = ytdl.extract_info(search_term, download=False)
+
+        # Check if 'entries' key exists (for search results)
+        if 'entries' in info:
+            # Retrieve the first search result
+            info = info['entries'][0]
+
+        # Check if 'url' and 'title' are available
+        if 'url' in info and 'title' in info:
+            return info['url'], info['title']
+        else:
+            raise KeyError("Required information ('url' or 'title') is missing in the extracted data.")
+    except Exception as e:
+        print(f"Error extracting information: {e}")
+        return None, None
 
 async def play_song(ctx, url, is_slash=False):
     if isinstance(ctx, commands.Context):
