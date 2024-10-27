@@ -4,6 +4,7 @@ from discord import app_commands
 import yt_dlp
 import os
 import subprocess
+import asyncio
 from youtubeSpotifyConverter import youtubeSpotifyConverter
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
@@ -78,7 +79,7 @@ async def play_song(ctx, url, is_slash=False):
 
         # Wait until the song finishes, then disconnect and notify
         while voice_client.is_playing():
-            await discord.utils.sleep_until(discord.utils.utcnow() + discord.utils.sleep_until(1))
+            await asyncio.sleep(1)  # Wait for 1 second
 
         await voice_client.disconnect()
         await ctx.send(f"Disconnected after playing **{title}**!")
