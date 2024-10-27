@@ -120,8 +120,10 @@ async def pause_song(ctx, is_slash=False):
     if voice_client and voice_client.is_playing():
         voice_client.pause()  # Pause the music
         msg = "Paused the music."
+        print("Music paused successfully.")  # Debug statement
     else:
         msg = "No music is currently playing!"
+        print("Attempted to pause music, but none was playing.")  # Debug statement
     
     await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
 
@@ -129,8 +131,10 @@ async def resume_song(ctx, is_slash=False):
     if ctx.guild.voice_client and ctx.guild.voice_client.is_paused():
         ctx.guild.voice_client.resume()
         msg = "Resumed the music."
+        print("Music resumed successfully.")  # Debug statement
     else:
         msg = "No music is currently paused!"
+        print("Attempted to resume music, but none was paused.")  # Debug statement
     
     await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
 
@@ -217,9 +221,8 @@ async def shell_slash(interaction: discord.Interaction, command: str):
 
 @bot.event
 async def on_ready():
-    await tree.sync()
-    print(f"Logged in as {bot.user}!")
-    print("Slash commands synced.")
+    print(f"Logged in as {bot.user.name} (ID: {bot.user.id})")
+    print("------")
 
 bot.run(DISCORD_TOKEN)
 
