@@ -114,18 +114,17 @@ async def stop_song(ctx, is_slash=False):
     else:
         await ctx.send(msg)
 
-# Pause the current song
 async def pause_song(ctx, is_slash=False):
-    voice_client = ctx.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.pause()  # Pause the music
+    if ctx.guild.voice_client and ctx.guild.voice_client.is_playing():
+        ctx.guild.voice_client.pause()
         msg = "Paused the music."
-        print("Music paused successfully.")  # Debug statement
     else:
         msg = "No music is currently playing!"
-        print("Attempted to pause music, but none was playing.")  # Debug statement
     
-    await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
+    if is_slash:
+        await ctx.followup.send(content=msg)
+    else:
+        await ctx.send(msg)
 
 async def resume_song(ctx, is_slash=False):
     if ctx.guild.voice_client and ctx.guild.voice_client.is_paused():
