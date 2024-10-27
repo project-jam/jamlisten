@@ -28,17 +28,14 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
+# Global variable to store loop status
+is_looping = False
+
 async def get_youtube_source(search_term):
     try:
-        # Search for video using yt-dlp
         info = ytdl.extract_info(search_term, download=False)
-
-        # Check if 'entries' key exists (for search results)
         if 'entries' in info:
-            # Retrieve the first search result
             info = info['entries'][0]
-
-        # Check if 'url' and 'title' are available
         if 'url' in info and 'title' in info:
             return info['url'], info['title']
         else:
@@ -48,6 +45,7 @@ async def get_youtube_source(search_term):
         return None, None
 
 async def play_song(ctx, url, is_slash=False):
+    global is_looping
     if isinstance(ctx, commands.Context):
         author_voice = ctx.author.voice
         voice_client = ctx.guild.voice_client
@@ -66,14 +64,23 @@ async def play_song(ctx, url, is_slash=False):
 
         source_url, title = await get_youtube_source(url)
 
+        def after_playing(error):
+            if error:
+                print(f"Playback error: {error}")
+            elif is_looping:
+                voice_client.play(discord.FFmpegPCMAudio(source_url), after=after_playing)
+            else:
+                bot.loop.create_task(voice_client.disconnect())
+                bot.loop.create_task(ctx.send("Disconnected because the song finished playing."))
+
         if voice_client.is_playing():
             voice_client.stop()
 
-        voice_client.play(discord.FFmpegPCMAudio(source_url))
+        voice_client.play(discord.FFmpegPCMAudio(source_url), after=after_playing)
         msg = f"Playing **{title}**!"
         
         if is_slash:
-            await ctx.followup.send(content=msg)  # Responds with a follow-up message for slash commands
+            await ctx.followup.send(content=msg)
         else:
             await ctx.send(msg)
     else:
@@ -84,6 +91,8 @@ async def play_song(ctx, url, is_slash=False):
             await ctx.send(msg)
 
 async def stop_song(ctx, is_slash=False):
+    global is_looping
+    is_looping = False  # Reset loop status
     if ctx.guild.voice_client:
         await ctx.guild.voice_client.disconnect()
         msg = "Stopped the music and left the voice channel."
@@ -154,6 +163,20 @@ async def resume(ctx):
 async def resume_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await resume_song(interaction, is_slash=True)
+
+@bot.command(name="loop")
+async def toggle_loop(ctx):
+    global is_looping
+    is_looping = not is_looping
+    status = "enabled" if is_looping else "disabled"
+    await ctx.send(f"Looping is now {status}.")
+
+@tree.command(name="loop", description="Toggle looping for the currently playing song")
+async def loop_slash(interaction: discord.Interaction):
+    global is_looping
+    is_looping = not is_looping
+    status = "enabled" if is_looping else "disabled"
+    await interaction.response.send_message(f"Looping is now {status}.")
 
 @bot.event
 async def on_ready():
