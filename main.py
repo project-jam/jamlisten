@@ -7,20 +7,18 @@ import subprocess
 import asyncio
 from youtubeSpotifyConverter import youtubeSpotifyConverter
 
-# Environment variables
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Initialize the converter and bot
 converter = youtubeSpotifyConverter(YOUTUBE_API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
+
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="jam!", intents=intents)
 tree = bot.tree
 
-# YouTube-DL options
 ytdl_opts = {
     'format': 'bestaudio/best',
     'default_search': 'ytsearch',
@@ -32,16 +30,15 @@ ytdl_opts = {
 }
 ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
-# Dictionary to store loop status for each guild
+# Dictionary to store the loop status for each guild
 loop_status = {}
 
-# Function to extract YouTube source
 async def get_youtube_source(search_term):
     try:
         info = ytdl.extract_info(search_term, download=False)
         if 'entries' in info:
             info = info['entries'][0]
-        
+
         if 'url' in info and 'title' in info:
             return info['url'], info['title']
         else:
@@ -50,11 +47,14 @@ async def get_youtube_source(search_term):
         print(f"Error extracting information: {e}")
         return None, None
 
-# Function to play song
 async def play_song(ctx, url, is_slash=False, interaction=None):
-    global loop_status
-    author_voice = ctx.author.voice if isinstance(ctx, commands.Context) else ctx.user.voice
-    voice_client = ctx.guild.voice_client
+    global loop_status  # Access global loop status
+    if isinstance(ctx, commands.Context):
+        author_voice = ctx.author.voice
+        voice_client = ctx.guild.voice_client
+    else:
+        author_voice = ctx.user.voice
+        voice_client = ctx.guild.voice_client
     
     if author_voice and author_voice.channel:
         voice_channel = author_voice.channel
@@ -72,27 +72,36 @@ async def play_song(ctx, url, is_slash=False, interaction=None):
 
         voice_client.play(discord.FFmpegPCMAudio(source_url), after=lambda e: print(f"Finished playing: {title}"))
         voice_client.source = discord.PCMVolumeTransformer(voice_client.source)
-        voice_client.source.volume = 0.5
+        voice_client.source.volume = 0.5  # Adjust the volume as needed
 
         msg = f"Playing **{title}**!"
-        await interaction.followup.send(content=msg) if is_slash else await ctx.send(msg)
+        
+        if is_slash:
+            await interaction.followup.send(content=msg)  # Use interaction here
+        else:
+            await ctx.send(msg)
 
+        # Wait until the song finishes, and check for loop status
         while voice_client.is_playing() or (loop_status.get(ctx.guild.id, False) and not voice_client.is_playing()):
-            await asyncio.sleep(1)
-
+            await asyncio.sleep(1)  # Wait for 1 second
+            
+            # If looping is enabled and the song has finished, restart it
             if not voice_client.is_playing() and loop_status.get(ctx.guild.id, False):
                 voice_client.play(discord.FFmpegPCMAudio(source_url), after=lambda e: print(f"Finished playing: {title}"))
-                await asyncio.sleep(1)
+                await asyncio.sleep(1)  # Short delay before checking again
 
+        # Disconnect after the song finishes if looping is off
         if not loop_status.get(ctx.guild.id, False):
             await voice_client.disconnect()
             if is_slash:
-                await interaction.followup.send(f"Disconnected after playing **{title}**!")
+                await interaction.followup.send(f"Disconnected after playing **{title}**!")  # Use interaction here
     else:
         msg = "You need to join a voice channel first!"
-        await interaction.followup.send(content=msg) if is_slash else await ctx.send(msg)
+        if is_slash:
+            await interaction.followup.send(content=msg)  # Use interaction here
+        else:
+            await ctx.send(msg)
 
-# Stop the current song
 async def stop_song(ctx, is_slash=False):
     if ctx.guild.voice_client:
         await ctx.guild.voice_client.disconnect()
@@ -100,19 +109,22 @@ async def stop_song(ctx, is_slash=False):
     else:
         msg = "I'm not currently in a voice channel!"
     
-    await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
+    if is_slash:
+        await ctx.followup.send(content=msg)
+    else:
+        await ctx.send(msg)
 
 # Pause the current song
 async def pause_song(ctx, is_slash=False):
-    if ctx.guild.voice_client and ctx.guild.voice_client.is_playing():
-        ctx.guild.voice_client.pause()
+    voice_client = ctx.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.pause()  # Pause the music
         msg = "Paused the music."
     else:
         msg = "No music is currently playing!"
     
     await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
 
-# Resume the current song
 async def resume_song(ctx, is_slash=False):
     if ctx.guild.voice_client and ctx.guild.voice_client.is_paused():
         ctx.guild.voice_client.resume()
@@ -122,65 +134,57 @@ async def resume_song(ctx, is_slash=False):
     
     await ctx.followup.send(content=msg) if is_slash else await ctx.send(msg)
 
-# Slash command to play music
 @tree.command(name="play", description="Play a song from a URL in the voice channel")
 async def play_slash(interaction: discord.Interaction, url: str):
     await interaction.response.defer()
-    await play_song(interaction, url, is_slash=True, interaction=interaction)
+    await play_song(interaction, url, is_slash=True, interaction=interaction)  # Pass interaction here
 
-# Text command to play music
 @bot.command(name="play")
 async def play(ctx, url: str):
     await play_song(ctx, url)
 
-# Stop command
 @bot.command(name="stop")
 async def stop(ctx):
     await stop_song(ctx)
 
-# Slash command to stop music
 @tree.command(name="stop", description="Stop the music and leave the voice channel")
 async def stop_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await stop_song(interaction, is_slash=True)
 
-# Pause command
 @bot.command(name="pause")
 async def pause(ctx):
     await pause_song(ctx)
 
-# Slash command to pause music
 @tree.command(name="pause", description="Pause the currently playing music")
 async def pause_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await pause_song(interaction, is_slash=True)
 
-# Resume command
 @bot.command(name="resume")
 async def resume(ctx):
     await resume_song(ctx)
 
-# Slash command to resume music
 @tree.command(name="resume", description="Resume the paused music")
 async def resume_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await resume_song(interaction, is_slash=True)
 
-# Loop command
 @bot.command(name="loop")
 async def loop(ctx):
+    # Toggle loop status for the current guild
     loop_status[ctx.guild.id] = not loop_status.get(ctx.guild.id, False)
     status = "enabled" if loop_status[ctx.guild.id] else "disabled"
     await ctx.send(f"Looping is now {status}!")
 
-# Ping command to check latency
 @bot.command(name="ping")
 async def ping(ctx):
+    # Get the latency in milliseconds
     latency_ms = round(bot.latency * 1000)
+    # Get the name of the server
     server_name = ctx.guild.name
     await ctx.send(f"Pong! It's {latency_ms} ms according to {server_name}.")
 
-# Shell command for executing system commands
 @bot.command(name="shell")
 async def shell(ctx, *, command: str):
     try:
@@ -188,14 +192,14 @@ async def shell(ctx, *, command: str):
         output = result.stdout.strip() or result.stderr.strip()
 
         if output:
+            # Split the output into chunks of 2000 characters or less
             for i in range(0, len(output), 2000):
-                await ctx.send(f"```ansi\n{output[i:i + 2000]}\n```")
+                await ctx.send(f"```ansi\n{output[i:i + 2000]}\n```")  # Mark as code with ansi
         else:
             await ctx.send("No output returned.")
     except Exception as e:
         await ctx.send(f"An error occurred: {e}")
 
-# Slash command for shell
 @tree.command(name="shell", description="Execute a shell command")
 async def shell_slash(interaction: discord.Interaction, command: str):
     await interaction.response.defer()
@@ -205,7 +209,7 @@ async def shell_slash(interaction: discord.Interaction, command: str):
         
         if output:
             for i in range(0, len(output), 2000):
-                await interaction.followup.send(f"```ansi\n{output[i:i + 2000]}\n```")
+                await interaction.followup.send(f"```ansi\n{output[i:i + 2000]}\n```")  # Mark as code with ansi
         else:
             await interaction.followup.send("No output returned.")
     except Exception as e:
@@ -217,6 +221,5 @@ async def on_ready():
     print(f"Logged in as {bot.user}!")
     print("Slash commands synced.")
 
-# Run the bot
 bot.run(DISCORD_TOKEN)
 
