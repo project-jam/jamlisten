@@ -175,7 +175,7 @@ async def shell(ctx, *, command: str):
         if output:
             # Split the output into chunks of 2000 characters or less
             for i in range(0, len(output), 2000):
-                await ctx.send(f"```\n{output[i:i + 2000]}\n```")
+                await ctx.send(f"```ansi\n{output[i:i + 2000]}\n```")  # Mark as code with ansi
         else:
             await ctx.send("No output returned.")
     except Exception as e:
@@ -190,7 +190,7 @@ async def shell_slash(interaction: discord.Interaction, command: str):
         
         if output:
             for i in range(0, len(output), 2000):
-                await interaction.followup.send(f"```\n{output[i:i + 2000]}\n```")
+                await interaction.followup.send(f"```ansi\n{output[i:i + 2000]}\n```")  # Mark as code with ansi
         else:
             await interaction.followup.send("No output returned.")
     except Exception as e:
