@@ -164,6 +164,16 @@ async def resume_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     await resume_song(interaction, is_slash=True)
 
+@tree.command(name="ping", description="Check the bot's latency")
+async def ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)  # Convert to milliseconds
+    await interaction.response.send_message(f"Pong! 🏓 Latency: {latency}ms")
+
+@bot.command(name="ping")
+async def ping_command(ctx):
+    latency = round(bot.latency * 1000)  # Convert to milliseconds
+    await ctx.send(f"Pong! 🏓 Latency: {latency}ms")
+
 @bot.event
 async def on_ready():
     await tree.sync()
