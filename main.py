@@ -6,6 +6,7 @@ import os
 import subprocess
 import asyncio
 from youtubeSpotifyConverter import youtubeSpotifyConverter
+from flask import Flask, send_from_directory
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_TOKEN")
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
@@ -201,6 +202,13 @@ async def shell_slash(interaction: discord.Interaction, command: str):
             await interaction.followup.send(f"```ansi\n{output[i:i + 2000]}\n```")
     except Exception as e:
         await interaction.followup.send(f"An error occurred: {e}")
+
+# Flask app setup
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return send_from_directory('', 'index.html')  # Serve index.html from the current directory
 
 @bot.event
 async def on_ready():
