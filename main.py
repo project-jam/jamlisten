@@ -196,7 +196,7 @@ async def shell(ctx, *, command: str):
 
             # Send each chunk of output as a separate message
             for chunk in split_output(output_cleaned):
-                await ctx.send(f"```ansi\n{chunk}\n```")
+                await ctx.send(f"```\n{chunk}\n```")
         except asyncio.TimeoutError:
             await ctx.send("You took too long to provide the password. Command cancelled.")
     else:
@@ -210,7 +210,7 @@ async def shell(ctx, *, command: str):
 
             # Send each chunk of output as a separate message
             for chunk in split_output(output_cleaned):
-                await ctx.send(f"```ansi\n{chunk}\n```")
+                await ctx.send(f"```\n{chunk}\n```")
         except Exception as e:
             await ctx.send(f"An error occurred: {e}")
 
@@ -243,7 +243,7 @@ async def shell_slash(interaction: discord.Interaction, command: str):
 
             # Send each chunk of output as a separate message
             for chunk in split_output(output_cleaned):
-                await interaction.followup.send(f"```ansi\n{chunk}\n```")
+                await interaction.followup.send(f"```\n{chunk}\n```")
         except asyncio.TimeoutError:
             await interaction.followup.send("You took too long to provide the password. Command cancelled.", ephemeral=True)
     else:
@@ -257,7 +257,7 @@ async def shell_slash(interaction: discord.Interaction, command: str):
 
             # Send each chunk of output as a separate message
             for chunk in split_output(output_cleaned):
-                await interaction.followup.send(f"```ansi\n{chunk}\n```")
+                await interaction.followup.send(f"```\n{chunk}\n```")
         except Exception as e:
             await interaction.followup.send(f"An error occurred: {e}", ephemeral=True)
 
